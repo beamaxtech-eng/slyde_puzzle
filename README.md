@@ -30,21 +30,6 @@ npx expo start        # scan the QR with Expo Go on your phone
 
 Regression: `npm run typecheck` (strict TypeScript, zero errors expected).
 
-## Firebase Analytics
-
-Firebase Analytics is integrated **natively on Android** via `@react-native-firebase/analytics`:
-
-- **Packages**: `@react-native-firebase/app` + `@react-native-firebase/analytics` (native SDK, autolinked)
-- **Config**: `android/app/google-services.json` (project `games-bad12`, package `com.anonymous.slyde`)
-- **Gradle**: `com.google.gms:google-services:4.5.0` plugin applied in `android/app/build.gradle`
-- **Utilities**: `src/analytics/index.ts` — `logCustomEvent()`, `logTestEvent()`, `AnalyticsEvents`
-- **Auto events**: `app_start` is logged from `App.tsx`; sessions/first-opens are collected automatically
-
-To verify on a device: run the app, then check **Firebase Console → Analytics → DebugView**
-(`adb shell setprop debug.firebase.analytics.app com.anonymous.slyde` enables debug mode).
-
-See `FIREBASE_ANALYTICS_IMPLEMENTATION.md` for detailed implementation information.
-
 ## Level generator (Phase 1a)
 
 ```bash
@@ -66,7 +51,6 @@ band with a deterministic retry loop (≤80 attempts, each seeded by
 Distance heuristics); 5×5/5×6 distances up to 130 are intractable with the
 current heuristics and the generator refuses to run it.
 
-
 ## Architecture
 
 ```
@@ -87,7 +71,6 @@ src/
   screens/                     Splash, Home, Map, PreLevel, Puzzle, Leaderboard, Settings
   nav.ts                       root stack param list
   audio.tsx                    expo-audio SFX + music (ducking) + haptics
-  analytics/index.ts            Firebase Analytics event logging (@react-native-firebase/analytics)
 assets/sfx/                    procedural WAVs (npm run generate:sfx)
 assets/puzzles/ 01..50.png     the 50 puzzle pictures (see its README.md)
 tools/generate-levels/generate.ts   offline generator (A*/IDA* verification)

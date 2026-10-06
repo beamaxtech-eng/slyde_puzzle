@@ -11,13 +11,7 @@
 // the two can never both fire.
 
 import React, { useCallback, useEffect, useRef } from "react";
-import {
-  Animated,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../nav";
@@ -25,6 +19,8 @@ import { C, MOTION, TYPE } from "../theme";
 import { feedback } from "../audio";
 import { WoodBackdrop } from "../components/ui";
 import { after, clearFlow } from "../flow";
+import auth from "@react-native-firebase/auth";
+import firestoreModule from "@react-native-firebase/firestore";
 
 type Nav = NativeStackNavigationProp<RootStackParamList, "Splash">;
 
@@ -43,6 +39,30 @@ export default function SplashScreen() {
   // flow engine so the tap below cancels it (cancellation law) — and so the
   // cleanup un-schedules it if this screen unmounts first.
   useEffect(() => after(MOTION.splashAutoMs, goHome), [goHome]);
+
+  useEffect(() => {
+    const registerAnonymous = async () => {
+      try {
+        const currentUser = auth().currentUser;
+
+        if (!currentUser) {
+          const result = await auth().signInAnonymously();
+          console.log("Anonymous user:", result.user.uid);
+        }
+
+        const user = auth().currentUser;
+        if (user) {
+          await firestore().collection("users").doc(user.uid).set({
+            createdAt: firestoreModule.FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (error) {
+        console.log("Anonymous login failed:", error);
+      }
+    };
+
+    void registerAnonymous();
+  }, []);
 
   // Cancellation-law safety net: leaving the splash kills pending automation.
   useEffect(() => () => clearFlow(), []);
@@ -184,3 +204,6 @@ const styles = StyleSheet.create({
     fontFamily: TYPE.serif,
   },
 });
+function firestore() {
+  return firestoreModule();
+}
