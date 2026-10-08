@@ -78,7 +78,7 @@ export default function SplashScreen() {
           {
             createdAt: serverTimestamp(),
           },
-          { merge: true }
+          { merge: true },
         );
 
         console.log("FIREBASE 6: Firestore write successful");
