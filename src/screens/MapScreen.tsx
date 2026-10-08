@@ -20,21 +20,35 @@
 // the next (0.9s) → brief landing hold → the next Puzzle replaces the map.
 // The cancellation law holds: any manual tap/back calls clearFlow().
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
-import Svg, { Polyline } from 'react-native-svg';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { C, MOTION, SPACE, TYPE } from '../theme';
-import MapNode from '../components/MapNode';
-import { useAppStore } from '../store/app';
-import { LEVELS_PER_TRACK, CHAPTER_1_LEVELS } from '../config';
-import type { TrackId } from '../config';
-import { after, clearFlow } from '../flow';
-import type { RootStackParamList } from '../nav';
-import { IconButton, Icon, WoodBackdrop } from '../components/ui';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  Animated,
+  Easing,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
+import type { NativeScrollEvent, NativeSyntheticEvent } from "react-native";
+import Svg, { Polyline } from "react-native-svg";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { C, MOTION, SPACE, TYPE } from "../theme";
+import MapNode from "../components/MapNode";
+import { useAppStore } from "../store/app";
+import { LEVELS_PER_TRACK, CHAPTER_1_LEVELS } from "../config";
+import type { TrackId } from "../config";
+import { after, clearFlow } from "../flow";
+import type { RootStackParamList } from "../nav";
+import { IconButton, Icon, WoodBackdrop } from "../components/ui";
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Map'>;
+type Props = NativeStackScreenProps<RootStackParamList, "Map">;
 
 const ROW_H = 200; // vertical rhythm of the river (node centres are ROW_H apart)
 const NODE = 46; // MapNode footprint
@@ -54,21 +68,24 @@ const RIVER_BAND = 10; // levels per strip
 const RIVER_BAND_PAD = 20; // headroom inside each strip for the stroke
 
 const GATE_SUB: Record<TrackId, string> = {
-  easy: 'bigger boards ahead: 3×4',
-  medium: 'bigger boards ahead: 4×5',
-  hard: 'bigger boards ahead: 5×6',
+  easy: "bigger boards ahead: 3×4",
+  medium: "bigger boards ahead: 4×5",
+  hard: "bigger boards ahead: 5×6",
 };
 
-function nodeState(level: number, unlocked: number): 'done' | 'current' | 'locked' {
-  if (level < unlocked) return 'done';
-  if (level === unlocked) return 'current';
-  return 'locked';
+function nodeState(
+  level: number,
+  unlocked: number,
+): "done" | "current" | "locked" {
+  if (level < unlocked) return "done";
+  if (level === unlocked) return "current";
+  return "locked";
 }
 
 /** The Chapter 2 plaque spanning the ladder band between the chapters. */
 function ChapterGate({ top, trackId }: { top: number; trackId: TrackId }) {
   return (
-    <View style={[styles.gate, { top }]} pointerEvents="none">
+    <View style={[styles.gate, { top }]} pointerEvents='none'>
       <View style={styles.gateRule} />
       <Text style={styles.gateTitle}>CHAPTER 2</Text>
       <Text style={styles.gateSub}>{GATE_SUB[trackId]}</Text>
@@ -78,7 +95,8 @@ function ChapterGate({ top, trackId }: { top: number; trackId: TrackId }) {
 }
 
 export default function MapScreen({ route, navigation }: Props) {
-  const { trackId, fromLevel, animateTo, autoStart } = route.params;
+  const trackId = route.params.trackId as TrackId;
+  const { fromLevel, animateTo, autoStart } = route.params;
   const { width } = useWindowDimensions();
   const progress = useAppStore((s) => s.progress);
   const bests = useAppStore((s) => s.bests);
@@ -89,10 +107,13 @@ export default function MapScreen({ route, navigation }: Props) {
   // ---- Ladder geometry: pure math, nothing measured at runtime ----
   const rowTop = useCallback(
     (level: number) =>
-      TOP_PAD + (LEVELS_PER_TRACK - level) * ROW_H + (level <= CHAPTER_SPLIT ? GATE_H : 0),
-    []
+      TOP_PAD +
+      (LEVELS_PER_TRACK - level) * ROW_H +
+      (level <= CHAPTER_SPLIT ? GATE_H : 0),
+    [],
   );
-  const contentHeight = TOP_PAD + LEVELS_PER_TRACK * ROW_H + GATE_H + BOTTOM_PAD;
+  const contentHeight =
+    TOP_PAD + LEVELS_PER_TRACK * ROW_H + GATE_H + BOTTOM_PAD;
 
   // ---- The river: one wide, smooth sine curve flowing up the map. Nodes sit
   // exactly on the curve; on every win the ★ SWIMS along it — its motion is
@@ -106,19 +127,18 @@ export default function MapScreen({ route, navigation }: Props) {
   const ampX = Math.min(width / 2 - NODE / 2 - 10, width * 0.32);
   const riverX = useCallback(
     (level: number) => width / 2 + Math.sin(level * RIVER_FREQ) * ampX,
-    [width, ampX]
+    [width, ampX],
   );
   // Continuous row geometry — valid for fractional levels while sampling.
   // The chapter gap blends linearly across the gate band (levels 50→51), so
   // the river and the ★ cross it as one smooth diagonal instead of a vertical
   // snap. Integer levels are pixel-identical to the old step function.
-  const rowCenterAt = useCallback(
-    (level: number) => {
-      const t = Math.min(1, Math.max(0, CHAPTER_SPLIT + 1 - level));
-      return TOP_PAD + (LEVELS_PER_TRACK - level) * ROW_H + t * GATE_H + ROW_H / 2;
-    },
-    []
-  );
+  const rowCenterAt = useCallback((level: number) => {
+    const t = Math.min(1, Math.max(0, CHAPTER_SPLIT + 1 - level));
+    return (
+      TOP_PAD + (LEVELS_PER_TRACK - level) * ROW_H + t * GATE_H + ROW_H / 2
+    );
+  }, []);
 
   // The river is drawn as short SVG strips (~RIVER_BAND levels tall) rather
   // than one full-height canvas — see RIVER_BAND. Each strip samples 0.75
@@ -126,7 +146,13 @@ export default function MapScreen({ route, navigation }: Props) {
   // the opaque strokes hide every join. Recomputed only when `unlocked` or
   // the layout changes — never on scroll.
   const riverBands = useMemo(() => {
-    const bands: { key: number; top: number; height: number; pts: string; donePts: string }[] = [];
+    const bands: {
+      key: number;
+      top: number;
+      height: number;
+      pts: string;
+      donePts: string;
+    }[] = [];
     const STEP = 0.25;
     for (let start = 1; start <= LEVELS_PER_TRACK; start += RIVER_BAND) {
       const end = Math.min(LEVELS_PER_TRACK, start + RIVER_BAND - 1);
@@ -141,7 +167,13 @@ export default function MapScreen({ route, navigation }: Props) {
         pts.push(p);
         if (lvl <= unlocked) donePts.push(p);
       }
-      bands.push({ key: start, top, height, pts: pts.join(' '), donePts: donePts.join(' ') });
+      bands.push({
+        key: start,
+        top,
+        height,
+        pts: pts.join(" "),
+        donePts: donePts.join(" "),
+      });
     }
     return bands;
   }, [riverX, rowCenterAt, unlocked]);
@@ -169,8 +201,9 @@ export default function MapScreen({ route, navigation }: Props) {
   // Levels render top→bottom as 100…1 so level 1 sits at the BOTTOM (D11:
   // progress = climbing up).
   const levelsDescending = useMemo(
-    () => Array.from({ length: LEVELS_PER_TRACK }, (_, i) => LEVELS_PER_TRACK - i),
-    []
+    () =>
+      Array.from({ length: LEVELS_PER_TRACK }, (_, i) => LEVELS_PER_TRACK - i),
+    [],
   );
 
   // ---- Visibility window: only rungs near the viewport mount their carved
@@ -178,7 +211,9 @@ export default function MapScreen({ route, navigation }: Props) {
   // whole climb, so the ladder never looks broken). Driven straight from
   // onScroll — no timers, no per-frame listeners — and the state only updates
   // when a boundary level actually changes, i.e. a few times per screenful.
-  const focusLevel = isFlowMode ? (fromLevel ?? animateTo ?? unlocked) : unlocked;
+  const focusLevel = isFlowMode
+    ? (fromLevel ?? animateTo ?? unlocked)
+    : unlocked;
   const [win, setWin] = useState(() => ({
     start: Math.max(1, focusLevel - WIN_BUFFER - 8),
     end: Math.min(LEVELS_PER_TRACK, focusLevel + WIN_BUFFER + 8),
@@ -193,7 +228,7 @@ export default function MapScreen({ route, navigation }: Props) {
       const y = rowTop(level) + ROW_H / 2 - viewportH / 2;
       return Math.max(0, Math.min(y, Math.max(0, contentHeight - viewportH)));
     },
-    [viewportH, rowTop, contentHeight]
+    [viewportH, rowTop, contentHeight],
   );
   // Latest framing fn for timer callbacks (the flow effect must not re-arm
   // when the viewport merely gets measured).
@@ -238,10 +273,10 @@ export default function MapScreen({ route, navigation }: Props) {
         end: Math.min(LEVELS_PER_TRACK, end + WIN_BUFFER),
       };
       setWin((prev) =>
-        prev.start === next.start && prev.end === next.end ? prev : next
+        prev.start === next.start && prev.end === next.end ? prev : next,
       );
     },
-    [viewportH, rowTop]
+    [viewportH, rowTop],
   );
 
   // ---- The ★ marker: one progress value — X/Y read straight off the river.
@@ -268,14 +303,25 @@ export default function MapScreen({ route, navigation }: Props) {
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: MOTION.nodePulseMs / 2, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0.4, duration: MOTION.nodePulseMs / 2, useNativeDriver: true }),
-      ])
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: MOTION.nodePulseMs / 2,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0.4,
+          duration: MOTION.nodePulseMs / 2,
+          useNativeDriver: true,
+        }),
+      ]),
     );
     loop.start();
     return () => loop.stop();
   }, [pulse]);
-  const glow = pulse.interpolate({ inputRange: [0.4, 1], outputRange: [0.12, 0.6] });
+  const glow = pulse.interpolate({
+    inputRange: [0.4, 1],
+    outputRange: [0.12, 0.6],
+  });
 
   // ---- Flow mode (UI-SPEC §4): settle → pop + glide → hold → next level ----
   useEffect(() => {
@@ -303,24 +349,39 @@ export default function MapScreen({ route, navigation }: Props) {
           }),
           // Pulse, overshoot, settle — the swimmer's kick.
           Animated.sequence([
-            Animated.spring(markerScale, { toValue: 1.3, speed: 26, bounciness: 8, useNativeDriver: true }),
-            Animated.spring(markerScale, { toValue: 1, speed: 20, bounciness: 7, useNativeDriver: true }),
+            Animated.spring(markerScale, {
+              toValue: 1.3,
+              speed: 26,
+              bounciness: 8,
+              useNativeDriver: true,
+            }),
+            Animated.spring(markerScale, {
+              toValue: 1,
+              speed: 20,
+              bounciness: 7,
+              useNativeDriver: true,
+            }),
           ]),
         ]).start();
         // The camera follows with the native scroll animation — no JS per frame.
-        scrollRef.current?.scrollTo({ y: centerRef.current(to), animated: true });
+        scrollRef.current?.scrollTo({
+          y: centerRef.current(to),
+          animated: true,
+        });
       }),
       after(
-        MOTION.flowMarkerDelayMs + MOTION.markerGlideMs + MOTION.flowLandingHoldMs,
+        MOTION.flowMarkerDelayMs +
+          MOTION.markerGlideMs +
+          MOTION.flowLandingHoldMs,
         () => {
           if (autoStart && animateTo != null) {
             clearFlow();
-            navigation.replace('Puzzle', { trackId, level: animateTo });
+            navigation.replace("Puzzle", { trackId, level: animateTo });
           } else {
             setMarkerVisible(false);
           }
-        }
-      )
+        },
+      ),
     );
     return () => cancels.forEach((c) => c());
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -332,7 +393,7 @@ export default function MapScreen({ route, navigation }: Props) {
   const goPlay = (level: number) => {
     if (level > unlocked) return;
     clearFlow(); // manual input kills all automation
-    navigation.navigate('PreLevel', { trackId, level });
+    navigation.navigate("PreLevel", { trackId, level });
   };
 
   return (
@@ -341,10 +402,10 @@ export default function MapScreen({ route, navigation }: Props) {
 
       <View style={styles.header}>
         <IconButton
-          icon="arrow-back"
+          icon='arrow-back'
           onPress={() => {
             clearFlow();
-            navigation.navigate('Home');
+            navigation.navigate("Home");
           }}
           size={28}
         />
@@ -362,8 +423,7 @@ export default function MapScreen({ route, navigation }: Props) {
         showsVerticalScrollIndicator={false}
         onLayout={(e) => setViewportH(e.nativeEvent.layout.height)}
         onScroll={onScroll}
-        scrollEventThrottle={16}
-      >
+        scrollEventThrottle={16}>
         {/* The river: short static strips — dark bed for the full length,
             brass flow where you've already climbed. Only strips inside the
             visibility window mount; painted once per unlock, never touched
@@ -375,27 +435,26 @@ export default function MapScreen({ route, navigation }: Props) {
           return (
             <Svg
               key={`river-${bStart}`}
-              pointerEvents="none"
-              style={{ position: 'absolute', left: 0, top: band.top }}
+              pointerEvents='none'
+              style={{ position: "absolute", left: 0, top: band.top }}
               width={width}
-              height={band.height}
-            >
+              height={band.height}>
               <Polyline
                 points={band.pts}
-                fill="none"
+                fill='none'
                 stroke={C.trailGroove}
                 strokeWidth={15}
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                strokeLinecap='round'
+                strokeLinejoin='round'
               />
               {band.donePts.length > 0 && (
                 <Polyline
                   points={band.donePts}
-                  fill="none"
+                  fill='none'
                   stroke={C.trailDashDone}
                   strokeWidth={10}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
                 />
               )}
             </Svg>
@@ -406,18 +465,25 @@ export default function MapScreen({ route, navigation }: Props) {
           const mounted = level >= win.start && level <= win.end;
           // The gate lives between the last chapter-1 row and the first
           // chapter-2 row — show it while either side of it is mounted.
-          const showGate = level === CHAPTER_SPLIT && win.start <= CHAPTER_SPLIT + 1 && win.end >= CHAPTER_SPLIT;
+          const showGate =
+            level === CHAPTER_SPLIT &&
+            win.start <= CHAPTER_SPLIT + 1 &&
+            win.end >= CHAPTER_SPLIT;
           if (!mounted && !showGate) return null;
           return (
             <React.Fragment key={level}>
-              {showGate && <ChapterGate top={rowTop(level) - GATE_H} trackId={trackId} />}
+              {showGate && (
+                <ChapterGate top={rowTop(level) - GATE_H} trackId={trackId} />
+              )}
               {mounted && (
                 <View
                   style={[
                     styles.row,
-                    { top: rowTop(level), transform: [{ translateX: riverX(level) - width / 2 }] },
-                  ]}
-                >
+                    {
+                      top: rowTop(level),
+                      transform: [{ translateX: riverX(level) - width / 2 }],
+                    },
+                  ]}>
                   {(level % 5 === 0 || level === unlocked) && (
                     <Text style={styles.levelNum}>{level}</Text>
                   )}
@@ -425,7 +491,9 @@ export default function MapScreen({ route, navigation }: Props) {
                     level={level}
                     state={nodeState(level, unlocked)}
                     glow={level === unlocked ? glow : 0}
-                    bestTimeMs={bests[`${trackId}-${level}`]?.bestTimeMs ?? null}
+                    bestTimeMs={
+                      bests[`${trackId}-${level}`]?.bestTimeMs ?? null
+                    }
                     onPress={() => goPlay(level)}
                   />
                 </View>
@@ -437,7 +505,7 @@ export default function MapScreen({ route, navigation }: Props) {
         {/* The ★ — laid out on the departure node, deltas ride the river */}
         {markerVisible && (
           <Animated.View
-            pointerEvents="none"
+            pointerEvents='none'
             style={[
               styles.marker,
               {
@@ -449,9 +517,8 @@ export default function MapScreen({ route, navigation }: Props) {
                   { scale: markerScale },
                 ],
               },
-            ]}
-          >
-            <Icon name="star" size={26} color={C.brassText} />
+            ]}>
+            <Icon name='star' size={26} color={C.brassText} />
           </Animated.View>
         )}
       </ScrollView>
@@ -462,30 +529,35 @@ export default function MapScreen({ route, navigation }: Props) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bgDeep },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingTop: 56,
     paddingBottom: 8,
     paddingHorizontal: SPACE.md,
     borderBottomWidth: 2,
     borderBottomColor: C.panelTopLine,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 3,
   },
-  heading: { color: C.textPrimary, fontSize: 20, fontWeight: 'bold', fontFamily: TYPE.serif },
+  heading: {
+    color: C.textPrimary,
+    fontSize: 20,
+    fontWeight: "bold",
+    fontFamily: TYPE.serif,
+  },
   counter: {
     color: C.brassLight,
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     fontFamily: TYPE.serif,
     minWidth: 50,
-    textAlign: 'right',
+    textAlign: "right",
   },
-  counterDim: { color: C.labelTan, fontWeight: '400', fontSize: 13 },
+  counterDim: { color: C.labelTan, fontWeight: "400", fontSize: 13 },
 
   scroll: { flex: 1 },
   content: { height: TOP_PAD + LEVELS_PER_TRACK * ROW_H + GATE_H + BOTTOM_PAD },
@@ -493,12 +565,12 @@ const styles = StyleSheet.create({
   // One rung: disc on the river, level number tucked beneath. The whole row
   // is shifted onto the curve via a layout-neutral transform.
   row: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     right: 0,
     height: ROW_H,
     paddingTop: (ROW_H - NODE) / 2,
-    alignItems: 'center',
+    alignItems: "center",
   },
   levelNum: {
     color: C.labelTan,
@@ -510,15 +582,15 @@ const styles = StyleSheet.create({
 
   // Chapter 2 band between the chapters.
   gate: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     right: 0,
     height: GATE_H,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   gateRule: {
-    alignSelf: 'center',
+    alignSelf: "center",
     width: 120,
     height: 2,
     borderRadius: 1,
@@ -529,30 +601,32 @@ const styles = StyleSheet.create({
     color: C.brassLight,
     fontSize: 13,
     letterSpacing: 2,
-    fontWeight: '700',
+    fontWeight: "700",
     fontFamily: TYPE.serif,
   },
-  gateSub: { color: C.labelTan, fontSize: 11, marginTop: 2, fontFamily: TYPE.serif },
+  gateSub: {
+    color: C.labelTan,
+    fontSize: 11,
+    marginTop: 2,
+    fontFamily: TYPE.serif,
+  },
 
   // The ★ flow marker — same brass coin; its real position is set inline
   // (left/top at the swim's tail) so clipping never detaches it.
   marker: {
-    position: 'absolute',
+    position: "absolute",
     width: NODE,
     height: NODE,
     borderRadius: NODE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: C.brass,
     borderWidth: 2,
     borderColor: C.brassLight,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 6,
     elevation: 6,
   },
 });
-
-
-

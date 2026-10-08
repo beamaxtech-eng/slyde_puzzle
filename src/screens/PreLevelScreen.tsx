@@ -8,6 +8,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { C, SPACE, TYPE } from "../theme";
 import { getLevel, datasetVersion, hasVerifiedDataset } from "../data/levels";
+import type { TrackId } from "../config";
 import { useAppStore } from "../store/app";
 import {
   WoodButton,
@@ -23,7 +24,8 @@ import type { RootStackParamList } from "../nav";
 type Props = NativeStackScreenProps<RootStackParamList, "PreLevel">;
 
 export default function PreLevelScreen({ route, navigation }: Props) {
-  const { trackId, level } = route.params;
+  const trackId = route.params.trackId as TrackId;
+  const { level } = route.params;
   const levelData = getLevel(trackId, level);
   const progress = useAppStore((s) => s.progress);
   const bests = useAppStore((s) => s.bests);
@@ -50,7 +52,7 @@ export default function PreLevelScreen({ route, navigation }: Props) {
       <WoodBackdrop />
       <View style={styles.header}>
         <IconButton
-          icon="arrow-back"
+          icon='arrow-back'
           onPress={() => navigation.goBack()}
           size={28}
         />
@@ -81,16 +83,14 @@ export default function PreLevelScreen({ route, navigation }: Props) {
                 : "—"
             }
           />
-          <InfoRow
-            label='STREAK'
-            value={`${streak} `}
-            icon="flame"
-          />
+          <InfoRow label='STREAK' value={`${streak} `} icon='flame' />
         </WoodGlassSurface>
 
         <Plaque style={styles.verify}>
           <View style={styles.verifyRow}>
-            {verified && <Icon name="checkmark-circle" size={14} color={C.greenSoft} />}
+            {verified && (
+              <Icon name='checkmark-circle' size={14} color={C.greenSoft} />
+            )}
             <Text style={styles.verifyText}>
               {verified ? "solver-verified (exact)" : "approximate (stub)"}
             </Text>
@@ -102,18 +102,27 @@ export default function PreLevelScreen({ route, navigation }: Props) {
           onPress={() => navigation.replace("Puzzle", { trackId, level })}
           style={styles.play}
         />
-        
       </View>
     </View>
   );
 }
 
-function InfoRow({ label, value, icon }: { label: string; value: string; icon?: IconName }) {
+function InfoRow({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string;
+  icon?: IconName;
+}) {
   return (
     <View style={styles.infoRow}>
       <Text style={styles.infoLabel}>{label}</Text>
       <View style={styles.infoValueContainer}>
-        {icon && <Icon name={icon} size={16} color={C.gold} style={styles.infoIcon} />}
+        {icon && (
+          <Icon name={icon} size={16} color={C.gold} style={styles.infoIcon} />
+        )}
         <Text style={styles.infoValue}>{value}</Text>
       </View>
     </View>

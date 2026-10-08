@@ -19,8 +19,13 @@ import { C, MOTION, TYPE } from "../theme";
 import { feedback } from "../audio";
 import { WoodBackdrop } from "../components/ui";
 import { after, clearFlow } from "../flow";
-import auth from "@react-native-firebase/auth";
-import firestoreModule from "@react-native-firebase/firestore";
+import { getAuth, signInAnonymously } from "@react-native-firebase/auth";
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  serverTimestamp,
+} from "@react-native-firebase/firestore";
 
 type Nav = NativeStackNavigationProp<RootStackParamList, "Splash">;
 
@@ -43,17 +48,20 @@ export default function SplashScreen() {
   useEffect(() => {
     const registerAnonymous = async () => {
       try {
-        const currentUser = auth().currentUser;
+        const auth = getAuth();
+        const firestore = getFirestore();
+
+        const currentUser = auth.currentUser;
 
         if (!currentUser) {
-          const result = await auth().signInAnonymously();
+          const result = await signInAnonymously(auth);
           console.log("Anonymous user:", result.user.uid);
         }
 
-        const user = auth().currentUser;
+        const user = auth.currentUser;
         if (user) {
-          await firestore().collection("users").doc(user.uid).set({
-            createdAt: firestoreModule.FieldValue.serverTimestamp(),
+          await setDoc(doc(firestore, "users", user.uid), {
+            createdAt: serverTimestamp(),
           });
         }
       } catch (error) {
@@ -204,6 +212,3 @@ const styles = StyleSheet.create({
     fontFamily: TYPE.serif,
   },
 });
-function firestore() {
-  return firestoreModule();
-}
