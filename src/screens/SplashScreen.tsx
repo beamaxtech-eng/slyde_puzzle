@@ -19,8 +19,23 @@ import { C, MOTION, TYPE } from "../theme";
 import { feedback } from "../audio";
 import { WoodBackdrop } from "../components/ui";
 import { after, clearFlow } from "../flow";
-import auth from "@react-native-firebase/auth";
-import firestoreModule from "@react-native-firebase/firestore";
+import {
+  getAuth,
+  signInAnonymously,
+} from "@react-native-firebase/auth";
+
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  serverTimestamp,
+} from "@react-native-firebase/firestore";
+
+import {
+  getAnalytics,
+  logEvent,
+} from "@react-native-firebase/analytics";
+
 
 type Nav = NativeStackNavigationProp<RootStackParamList, "Splash">;
 
@@ -40,29 +55,53 @@ export default function SplashScreen() {
   // cleanup un-schedules it if this screen unmounts first.
   useEffect(() => after(MOTION.splashAutoMs, goHome), [goHome]);
 
-  useEffect(() => {
-    const registerAnonymous = async () => {
-      try {
-        const currentUser = auth().currentUser;
+useEffect(() => {
+  const initializeFirebase = async () => {
+    try {
+      console.log("FIREBASE 1: starting");
 
-        if (!currentUser) {
-          const result = await auth().signInAnonymously();
-          console.log("Anonymous user:", result.user.uid);
-        }
+      const firebaseAuth = getAuth();
 
-        const user = auth().currentUser;
-        if (user) {
-          await firestore().collection("users").doc(user.uid).set({
-            createdAt: firestoreModule.FieldValue.serverTimestamp(),
-          });
-        }
-      } catch (error) {
-        console.log("Anonymous login failed:", error);
+      console.log("FIREBASE 2: Auth initialized");
+
+      let user = firebaseAuth.currentUser;
+
+      if (!user) {
+        console.log("FIREBASE 3: signing in anonymously");
+
+        const result = await signInAnonymously(firebaseAuth);
+
+        user = result.user;
+
+        console.log("FIREBASE 4: anonymous sign-in successful");
       }
-    };
 
-    void registerAnonymous();
-  }, []);
+      console.log("FIREBASE 5: UID =", user.uid);
+
+      const db = getFirestore();
+
+      await setDoc(
+        doc(db, "users", user.uid),
+        {
+          createdAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      console.log("FIREBASE 6: Firestore write successful");
+
+      const firebaseAnalytics = getAnalytics();
+
+      await logEvent(firebaseAnalytics, "app_initialized");
+
+      console.log("FIREBASE 7: Analytics event successful");
+    } catch (error) {
+      console.error("FIREBASE FAILED:", error);
+    }
+  };
+
+  void initializeFirebase();
+}, []);
 
   // Cancellation-law safety net: leaving the splash kills pending automation.
   useEffect(() => () => clearFlow(), []);
@@ -204,6 +243,4 @@ const styles = StyleSheet.create({
     fontFamily: TYPE.serif,
   },
 });
-function firestore() {
-  return firestoreModule();
-}
+

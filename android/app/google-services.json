@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "527662662486",
+    "project_id": "games-bad12",
+    "storage_bucket": "games-bad12.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:527662662486:android:52f104c5ce173579668cf7",
+        "android_client_info": {
+          "package_name": "com.beamaxtech.slyde_puzzle"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAY3R8Nx8yVc-95vErdIhuKwViqhdXHhmU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
