@@ -1,4 +1,4 @@
-package com.anonymous.slyde
+package com.beamaxtech.slyde_puzzle
 
 import android.app.Application
 import android.content.res.Configuration

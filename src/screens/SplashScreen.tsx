@@ -26,6 +26,7 @@ import {
   setDoc,
   serverTimestamp,
 } from "@react-native-firebase/firestore";
+import { getAnalytics, logEvent } from "@react-native-firebase/analytics";
 
 type Nav = NativeStackNavigationProp<RootStackParamList, "Splash">;
 
@@ -46,30 +47,52 @@ export default function SplashScreen() {
   useEffect(() => after(MOTION.splashAutoMs, goHome), [goHome]);
 
   useEffect(() => {
-    const registerAnonymous = async () => {
+    const initializeFirebase = async () => {
       try {
-        const auth = getAuth();
-        const firestore = getFirestore();
+        console.log("FIREBASE 1: starting");
 
-        const currentUser = auth.currentUser;
+        const firebaseAuth = getAuth();
+        console.log("FIREBASE 2: Auth initialized");
 
-        if (!currentUser) {
-          const result = await signInAnonymously(auth);
-          console.log("Anonymous user:", result.user.uid);
+        let user = firebaseAuth.currentUser;
+
+        if (!user) {
+          console.log("FIREBASE 3: signing in anonymously");
+
+          const result = await signInAnonymously(firebaseAuth);
+          user = result.user;
+
+          console.log("FIREBASE 4: anonymous sign-in successful");
         }
 
-        const user = auth.currentUser;
-        if (user) {
-          await setDoc(doc(firestore, "users", user.uid), {
+        if (!user) {
+          throw new Error("No Firebase user available after anonymous sign-in");
+        }
+
+        console.log("FIREBASE 5: UID =", user.uid);
+
+        const db = getFirestore();
+
+        await setDoc(
+          doc(db, "users", user.uid),
+          {
             createdAt: serverTimestamp(),
-          });
-        }
+          },
+          { merge: true }
+        );
+
+        console.log("FIREBASE 6: Firestore write successful");
+
+        const firebaseAnalytics = getAnalytics();
+        await logEvent(firebaseAnalytics, "app_initialized");
+
+        console.log("FIREBASE 7: Analytics event successful");
       } catch (error) {
-        console.log("Anonymous login failed:", error);
+        console.error("FIREBASE FAILED:", error);
       }
     };
 
-    void registerAnonymous();
+    void initializeFirebase();
   }, []);
 
   // Cancellation-law safety net: leaving the splash kills pending automation.

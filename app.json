@@ -17,13 +17,16 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.slyde"
+      "package": "com.beamaxtech.slyde_puzzle"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-font",
+      "expo-asset",
+      "@react-native-firebase/analytics"
     ],
     "extra": {
       "eas": {
