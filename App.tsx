@@ -17,6 +17,8 @@ import LeaderboardScreen from "./src/screens/LeaderboardScreen";
 import SettingsScreen from "./src/screens/SettingsScreen";
 import { useAppStore } from "./src/store/app";
 import { AudioProvider } from "./src/audio";
+import { initAds } from "./src/ads/adsService";
+import { initPurchases } from "./src/purchases/purchases";
 import type { RootStackParamList } from "./src/nav";
 import { C } from "./src/theme";
 
@@ -53,6 +55,22 @@ export default function App() {
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
+
+  // Monetization boot (monetization spec §10): resolve the purchase
+  // entitlement FIRST — so a paying user never even preloads an ad — then
+  // consent + ad SDK + preloads. Runs once, after the store is hydrated.
+  useEffect(() => {
+    if (!hydrated) return;
+    let cancelled = false;
+    void (async () => {
+      await initPurchases();
+      if (cancelled) return;
+      await initAds();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated]);
 
   if (!hydrated) {
     // Hydration gate: no navigation here. SplashScreen (which uses

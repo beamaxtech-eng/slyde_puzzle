@@ -5,6 +5,7 @@
 
 import React, { useState } from "react";
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,6 +15,7 @@ import {
 } from "react-native";
 import { C, SPACE, TYPE } from "../theme";
 import { useAppStore } from "../store/app";
+import { buyRemoveAds, restorePurchases } from "../purchases/purchases";
 import {
   BrassSwitch,
   ConfirmDialog,
@@ -38,6 +40,32 @@ export default function SettingsScreen({ navigation }: Props) {
   const [defaultTrack, setDefaultTrack] = useState<TrackId>("easy");
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<PendingReset>(null);
+
+  // ---- Ads & purchases (monetization spec §13) ----
+  const adsRemoved = useAppStore((s) => s.settings.adsRemoved);
+  const adFreeEnabled = useAppStore((s) => s.settings.adFreeEnabled);
+  const setAdFreeEnabled = useAppStore((s) => s.setAdFreeEnabled);
+
+  const onBuy = async () => {
+    setBusy(true);
+    const r = await buyRemoveAds();
+    setBusy(false);
+    if (r === "error") Alert.alert("Purchase failed", "Please try again later.");
+    // 'cancelled' = the user closed the store sheet: no feedback needed.
+    // 'ok' flips this whole section to the ad-free switch instantly.
+  };
+
+  const onRestore = async () => {
+    setBusy(true);
+    const ok = await restorePurchases();
+    setBusy(false);
+    Alert.alert(
+      ok ? "Restored" : "Nothing to restore",
+      ok
+        ? "Ad-free is active again."
+        : "No previous purchase was found for this store account."
+    );
+  };
 
   const onToggle = (key: "music" | "sound" | "haptics", value: boolean) => {
     if (key === "sound" && !value) {
@@ -87,6 +115,49 @@ export default function SettingsScreen({ navigation }: Props) {
             label='Haptics'
             value={settings.haptics}
             onValueChange={(v) => onToggle("haptics", v)}
+          />
+        </Panel>
+
+        <Text style={styles.section}>Ads</Text>
+        <Panel>
+          {adsRemoved ? (
+            // PAID USERS: the ad-free switch. Toggling never loses the
+            // purchase — it only re-enables/disables banners + interstitials;
+            // the rewarded "+30s" stays available either way.
+            <>
+              <BrassSwitch
+                label="Ad-free mode"
+                value={adFreeEnabled}
+                onValueChange={setAdFreeEnabled}
+              />
+              <Text style={styles.adsHint}>
+                {adFreeEnabled
+                  ? "Banners and win-screen video ads are off."
+                  : "Ads are back on. Switch on to hide them again — your purchase is never lost."}
+              </Text>
+            </>
+          ) : (
+            // FREE USERS: the purchase button.
+            <>
+              <WoodButton
+                label="Remove Ads"
+                onPress={() => void onBuy()}
+                disabled={busy}
+                style={styles.adsFirstButton}
+              />
+              <Text style={styles.adsHint}>
+                One-time purchase. Hides the map banner and win-screen video
+                ads.
+              </Text>
+            </>
+          )}
+          {/* Apple requires a restore control (monetization spec §15.7). */}
+          <WoodButton
+            label="Restore Purchases"
+            variant="ghost"
+            onPress={() => void onRestore()}
+            disabled={busy}
+            style={styles.adsButton}
           />
         </Panel>
 
@@ -206,6 +277,16 @@ const styles = StyleSheet.create({
     fontFamily: TYPE.serif,
   },
   groupLabelActive: { color: C.brassText, fontWeight: "700" },
+  // ---- Ads & purchases section ----
+  adsFirstButton: { marginTop: SPACE.xs },
+  adsButton: { marginTop: SPACE.sm },
+  adsHint: {
+    color: C.labelTan,
+    fontSize: 12,
+    marginTop: SPACE.xs,
+    marginBottom: SPACE.sm,
+    fontFamily: TYPE.serif,
+  },
   destructiveZone: { marginTop: SPACE.xl },
   sectionDanger: {
     color: C.red,

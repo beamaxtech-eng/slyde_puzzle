@@ -13,6 +13,8 @@ import { puzzleImageForLevel } from '../data/puzzles';
 import { LEVELS_PER_TRACK } from '../config';
 import { useAppStore } from '../store/app';
 import { playSfx, haptic, setDucked } from '../audio';
+import { maybeShowInterstitial, onRewardedReadyChange, showRewarded } from '../ads/adsService';
+import { AD_RULES } from '../ads/adConfig';
 import { WoodButton, Plaque, ConfirmDialog, IconButton, Icon, WoodBackdrop, WoodGlassSurface } from '../components/ui';
 import { TileBoard, tileModeForLevel, BOARD_BORDER } from '../components/TileBoard';
 import type { RootStackParamList } from '../nav';
@@ -126,30 +128,76 @@ export default function PuzzleScreen({ route, navigation }: Props) {
 
 
   // Auto-flow after a win (Flow 2): hold 2200ms => Map flow mode => star N->N+1.
+  // The interstitial (if one is due) runs BEFORE the hold timer is armed, so
+  // the ★ flow never ticks behind an open ad (monetization spec §12.1); when
+  // no ad is due this resolves instantly and the timing is unchanged. The ad
+  // itself covers the screen, so a manual tap can't race it — and clearFlow()
+  // from any manual tap still kills the armed timer (cancellation law).
   useEffect(() => {
     if (status !== 'won') return;
+    let cancelled = false;
     const cancels: (() => void)[] = [];
-    cancels.push(
-      after(MOTION.winHoldMs, () => {
-        clearFlow();
-        if (level >= LEVELS_PER_TRACK) {
-          // No level 101 — hand the player back to the map (manual mode).
-          navigation.popTo('Map', { trackId });
-        } else {
-          // popTo, not replace: the Map may still be below us from manual play,
-          // and a second Map stacked over the first would make back ambiguous.
-          navigation.popTo('Map', { trackId, fromLevel: level, animateTo: level + 1, autoStart: true });
-        }
-      })
-    );
-    return () => cancels.forEach((c) => c());
+    void maybeShowInterstitial().then(() => {
+      if (cancelled) return;
+      cancels.push(
+        after(MOTION.winHoldMs, () => {
+          clearFlow();
+          if (level >= LEVELS_PER_TRACK) {
+            // No level 101 — hand the player back to the map (manual mode).
+            navigation.popTo('Map', { trackId });
+          } else {
+            // popTo, not replace: the Map may still be below us from manual play,
+            // and a second Map stacked over the first would make back ambiguous.
+            navigation.popTo('Map', { trackId, fromLevel: level, animateTo: level + 1, autoStart: true });
+          }
+        })
+      );
+    });
+    return () => {
+      cancelled = true;
+      cancels.forEach((c) => c());
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status === 'won']);
 
+  // ---- Rewarded "+30s" on the fail overlay (monetization spec §12.2) ----
+  // Offered once per attempt (attemptId increments on every restart) and
+  // only while an ad is actually loaded. Rewarded ads are user-initiated, so
+  // they stay available even in ad-free mode; a continued attempt still
+  // counts as NOT a first-attempt solve (streak rule).
+  const [rewardOffered, setRewardOffered] = useState(false);
+  const [rewardedReady, setRewardedReady] = useState(false);
+  const [rewardAdOpen, setRewardAdOpen] = useState(false);
+
+  // A new attempt re-offers the reward.
+  useEffect(() => {
+    setRewardOffered(false);
+  }, [attemptId]);
+
+  // The +30s button appears/vanishes as a rewarded ad finishes/fails loading.
+  useEffect(() => onRewardedReadyChange(setRewardedReady), []);
+
+  const watchAdForBonus = useCallback(async () => {
+    if (rewardAdOpen) return;
+    setRewardAdOpen(true); // pauses the fail gate + auto-retry while playing
+    const earned = await showRewarded();
+    setRewardAdOpen(false);
+    if (!earned) return; // closed early: no bonus; the fail gate re-arms itself
+    setRewardOffered(true);
+    // A continued attempt is not a first-attempt solve (streak rule above).
+    setRestarted(true);
+    setFailArmed(false);
+    failHandledRef.current = false; // the bonus clock can now fail for real
+    beginTimer(AD_RULES.rewardedBonusSeconds); // same board state, fresh 30s
+  }, [rewardAdOpen]);
+
   // Idle-aware fail gate (Flow 3): silence 5000ms => land on Map.
+  // Paused while a rewarded ad is open: the idle fade and the auto-retry
+  // must never fire mid-ad; closing without a reward re-arms a fresh 5s
+  // window (this effect re-runs when rewardAdOpen flips back to false).
   const [failArmed, setFailArmed] = useState(false);
   useEffect(() => {
-    if (status !== 'failed') return;
+    if (status !== 'failed' || rewardAdOpen) return;
     const cancels: (() => void)[] = [];
     cancels.push(
       after(MOTION.failIdleMs, () => {
@@ -159,10 +207,10 @@ export default function PuzzleScreen({ route, navigation }: Props) {
     );
     return () => cancels.forEach((c) => c());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status === 'failed']);
+  }, [status === 'failed', rewardAdOpen]);
 
   useEffect(() => {
-    if (status === 'failed' && failArmed) {
+    if (status === 'failed' && !rewardAdOpen && failArmed) {
       const t = setTimeout(() => {
         clearFlow();
         restart();
@@ -171,9 +219,14 @@ export default function PuzzleScreen({ route, navigation }: Props) {
     }
     return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [failArmed, status === 'failed']);  function beginTimer() {
+  }, [failArmed, status === 'failed', rewardAdOpen]);
+
+  function beginTimer(remainingSec?: number) {
     stopTimer();
-    const total = levelData.timeLimitSeconds;
+    // A fresh attempt gets the level's full limit; a resumed attempt
+    // (rewarded "+30s") continues the same board with only the bonus on
+    // the clock.
+    const total = remainingSec ?? levelData.timeLimitSeconds;
     setTimeLeft(total);
     setStatus('idle');
     setDucked(false);
@@ -430,6 +483,18 @@ export default function PuzzleScreen({ route, navigation }: Props) {
             bodyStyle={[styles.overlayCardBody, { width: cardW }]}>
             <Text style={styles.overlayTitleDanger}>Time's up!</Text>
             <Text style={styles.overlayBody}>Tap anywhere to auto-retry…</Text>
+            {/* Rewarded "+30s" (monetization spec §12.2): once per attempt,
+                only while an ad is loaded. The ad opens over the overlay, so
+                the idle fade + auto-retry are paused while it plays. */}
+            {!rewardOffered && rewardedReady && (
+              <WoodButton
+                label={`Watch ad: +${AD_RULES.rewardedBonusSeconds}s`}
+                onPress={() => {
+                  void watchAdForBonus();
+                }}
+                style={styles.overlayButton}
+              />
+            )}
             <WoodButton label="Retry now" onPress={restart} style={styles.overlayButton} />
             <WoodButton label="Level map" variant="ghost" onPress={backToMap} style={styles.overlayButton} />
           </WoodGlassSurface>

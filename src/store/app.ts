@@ -32,11 +32,26 @@ interface AppState {
   /** Marks a timer fail (streak reset; first-attempt continuity broken). */
   failLevel: (track: TrackId) => void;
   setSettings: (partial: Partial<Settings>) => Promise<void>;
+  /** Purchase-driven (RevenueCat): true when the "Remove Ads" entitlement is active. */
+  setAdsRemoved: (v: boolean) => void;
+  /** User's ad-free switch — ignored unless adsRemoved (anti-abuse rule). */
+  setAdFreeEnabled: (v: boolean) => void;
+  /** Derived: !(adsRemoved && adFreeEnabled). Banner + interstitial only. */
+  adsActive: () => boolean;
   resetTrack: (track: TrackId) => Promise<void>;
   resetAllProgress: () => Promise<void>;
 }
 
-const DEFAULT_SETTINGS: Settings = { music: true, sound: true, haptics: true };
+// adsRemoved defaults false (nothing purchased); adFreeEnabled defaults true —
+// ad-free is ON the moment a purchase lands, and the switch then lets the
+// user turn ads back on without ever losing the purchase.
+const DEFAULT_SETTINGS: Settings = {
+  music: true,
+  sound: true,
+  haptics: true,
+  adsRemoved: false,
+  adFreeEnabled: true,
+};
 
 function emptyProgress(): Record<TrackId, TrackProgress> {
   return {
@@ -113,6 +128,26 @@ export const useAppStore = create<AppState>((set, get) => ({
     const next = { ...get().settings, ...partial };
     set({ settings: next });
     await db.saveSettings(next);
+  },
+
+  setAdsRemoved: (v) => {
+    // RevenueCat is the source of truth; this only mirrors it into the store
+    // (and SQLite, via setSettings) so the app starts correctly offline.
+    void get().setSettings({ adsRemoved: v });
+  },
+
+  // The switch can never grant ad-free on its own: ignored unless purchased.
+  setAdFreeEnabled: (v) => {
+    if (!get().settings.adsRemoved) return;
+    void get().setSettings({ adFreeEnabled: v });
+  },
+
+  // adsActive = !(adsRemoved && adFreeEnabled). Only the banner and the
+  // interstitial check this — the rewarded ad is user-initiated and stays
+  // available in ad-free mode (monetization spec §1.2).
+  adsActive: () => {
+    const { adsRemoved, adFreeEnabled } = get().settings;
+    return !(adsRemoved && adFreeEnabled);
   },
 
   resetTrack: async (track) => {

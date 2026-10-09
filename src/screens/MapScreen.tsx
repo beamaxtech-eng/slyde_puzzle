@@ -47,6 +47,7 @@ import type { TrackId } from "../config";
 import { after, clearFlow } from "../flow";
 import type { RootStackParamList } from "../nav";
 import { IconButton, Icon, WoodBackdrop } from "../components/ui";
+import MapBanner from "../ads/MapBanner";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Map">;
 
@@ -522,6 +523,12 @@ export default function MapScreen({ route, navigation }: Props) {
           </Animated.View>
         )}
       </ScrollView>
+
+      {/* Map-only adaptive banner (monetization spec §11) — pinned below the
+          scrollable path so it can never cover a level node, and collapsed
+          entirely while ad-free or unloaded. NEVER mount on the Puzzle
+          screen: a banner there mis-taps drags. */}
+      <MapBanner />
     </View>
   );
 }

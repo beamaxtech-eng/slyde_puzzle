@@ -26,7 +26,15 @@
       "expo-sqlite",
       "expo-font",
       "expo-asset",
-      "@react-native-firebase/analytics"
+      "@react-native-firebase/analytics",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
+          "userTrackingPermission": "This identifier will be used to deliver personalized ads to you."
+        }
+      ]
     ],
     "extra": {
       "eas": {

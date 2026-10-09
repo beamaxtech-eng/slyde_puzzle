@@ -41,6 +41,12 @@ export interface Settings {
   music: boolean;
   sound: boolean;
   haptics: boolean;
+  /** The purchased "Remove Ads" entitlement. RevenueCat is the source of
+   *  truth; this is the local cache so the app starts correctly offline. */
+  adsRemoved: boolean;
+  /** The user's ad-free switch — only meaningful when adsRemoved is true.
+   *  Defaults ON after purchase; toggling off never revokes the purchase. */
+  adFreeEnabled: boolean;
 }
 
 /** Snapshot of the whole local DB state, used to hydrate the Zustand store. */

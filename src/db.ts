@@ -74,7 +74,13 @@ function parseSettings(map: Record<string, string>): Settings {
     const v = map[k];
     return v === undefined ? def : v === '1';
   };
-  return { music: bool('music', true), sound: bool('sound', true), haptics: bool('haptics', true) };
+  return {
+    music: bool('music', true),
+    sound: bool('sound', true),
+    haptics: bool('haptics', true),
+    adsRemoved: bool('adsRemoved', false),
+    adFreeEnabled: bool('adFreeEnabled', true),
+  };
 }
 
 /**
